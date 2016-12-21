@@ -1,0 +1,89 @@
+model workshops
+uses "mmxprs","mmsystem","mmetc"; !gain access to the necessary packages
+
+parameters
+	MIN_CLASS_SIZE = 7
+	MAX_NUM_CLASSES = 3
+	
+	NCLASSES = 6
+	NSTUDENTS = 30
+	
+	TXTFILE_PREFERENCES = "C:\\DIRECTORY\\workshop_survey_input.dat"
+end-parameters
+
+declarations
+	classes = 1..NCLASSES
+	students = 1..NSTUDENTS
+	PREFS: array(students,classes) of real
+	COURSE_NAMES: array(classes) of string
+	STUDENT_NAMES: array(students) of string
+	
+	x: array(students,classes) of mpvar
+	y: array(classes) of mpvar
+end-declarations
+
+initializations from TXTFILE_PREFERENCES 
+ 	PREFS
+ 	COURSE_NAMES
+ 	STUDENT_NAMES
+end-initializations
+
+writeln('Data loaded successfully.')
+
+!Objective
+prefsum:=sum(s in students, c in classes) PREFS(s,c)*x(s,c)
+
+!Constraint: x is binary
+forall(s in students, c in classes) do
+	x(s,c) is_binary
+end-do
+
+!Constraint: y is binary
+forall(c in classes) do
+	y(c) is_binary
+end-do
+
+!Constraint: max workshops
+sum(c in classes) y(c) <= MAX_NUM_CLASSES
+
+!Constraint: one workshop per student
+forall(s in students) do
+	sum(c in classes) x(s,c) = 1
+end-do
+
+!Constraint: min students per workshop
+forall(c in classes) do
+	sum(s in students) x(s,c) >= MIN_CLASS_SIZE * y(c)
+end-do
+
+!Constraint: only valid workshops
+forall(s in students, c in classes) do
+	x(s,c) <= y(c)
+end-do
+
+writeln("Objective and constraints defined. Running optimization...")
+
+minimize(prefsum)
+
+!Write Output
+writeln("End running model")
+writeln("")
+writeln("Courses and students chosen:")
+writeln("")
+forall(c in classes) do
+	if(y(c).sol=1) then 
+		writeln(COURSE_NAMES(c))
+		forall(s in students) do
+			if(x(s,c).sol=1) then
+				writeln("  ",
+					STUDENT_NAMES(s),
+					"        (preference: ",
+					PREFS(s,c),
+					" )")
+			end-if
+		end-do
+		writeln("")
+	end-if
+end-do
+
+end-model
